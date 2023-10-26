@@ -710,6 +710,9 @@ def test_add_columns(tmp_path, pool_executor):
 
     dataset.add_columns(double_a, ["a"], pool_executor=pool_executor)
 
+    if pool_executor:
+        pool_executor.shutdown()
+
     expected = tab.append_column("double_a", pa.array([2 * x for x in range(100)]))
     assert expected == dataset.to_table()
 
