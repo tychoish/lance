@@ -34,6 +34,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    TypedDict,
     Union,
 )
 
