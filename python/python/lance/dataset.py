@@ -20,7 +20,7 @@ import os
 import random
 import warnings
 from abc import ABC, abstractmethod
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import lru_cache, partial
@@ -590,10 +590,10 @@ class LanceDataset(pa.dataset.Dataset):
     def add_columns(
         self,
         func: Callable[[pa.RecordBatch], pa.RecordBatch],
-        columns: Optional[List[str]] = None,
         *,
+        read_columns: Optional[List[str]] = None,
         commit_lock: Optional[CommitLock] = None,
-        pool_executor: Optional[Union[ProcessPoolExecutor, ThreadPoolExecutor]] = None,
+        pool_executor: Optional[ThreadPoolExecutor] = None,
     ):
         """
         Add new columns by computing them based on input data.
@@ -607,14 +607,14 @@ class LanceDataset(pa.dataset.Dataset):
             A function that takes a RecordBatch as input and returns a RecordBatch
             or Pandas DataFrame. This should return only the new columns you wish
             to add.
-        columns: Optional[list[str]].
+        read_columns: Optional[list[str]].
             If specified, only the columns in this list will be passed to the
             value_func. Otherwise, all columns will be passed to the value_func.
         commit_lock : CommitLock, optional
             A custom commit lock.  Only needed if your object store does not support
             atomic commits.  See the user guide for more details.
-        pool_executor: ProcessPoolExecutor or ThreadPoolExecutor, optional
-            A process or thread pool to run the function concurrently. This will
+        pool_executor: ThreadPoolExecutor, optional
+            A thread pool to run the function concurrently. This will
             write out the data in parallel across fragments.
 
         Examples
@@ -642,7 +642,7 @@ class LanceDataset(pa.dataset.Dataset):
         # call this append_columns?)
 
         # Infer the schema based on the first batch
-        sample_batch = func(next(iter(self.to_batches(limit=1, columns=columns))))
+        sample_batch = func(next(iter(self.to_batches(limit=1, columns=read_columns))))
         if isinstance(sample_batch, pd.DataFrame):
             sample_batch = pa.RecordBatch.from_pandas(sample_batch)
         output_schema = sample_batch.schema
@@ -657,12 +657,12 @@ class LanceDataset(pa.dataset.Dataset):
 
         if pool_executor:
             task = partial(
-                LanceFragment.add_columns, value_func=wrapped, columns=columns
+                LanceFragment.add_columns, value_func=wrapped, columns=read_columns
             )
             new_fragments = list(pool_executor.map(task, self.get_fragments()))
         else:
             new_fragments = [
-                fragment.add_columns(wrapped, columns)
+                fragment.add_columns(wrapped, read_columns)
                 for fragment in self.get_fragments()
             ]
 

@@ -19,7 +19,7 @@ import platform
 import re
 import time
 import uuid
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
@@ -697,10 +697,9 @@ def double_a(batch):
     "pool_executor",
     [
         None,
-        ProcessPoolExecutor(2),
         ThreadPoolExecutor(2),
     ],
-    ids=["no_pool", "process_pool", "thread_pool"],
+    ids=["no_pool", "thread_pool"],
 )
 def test_add_columns(tmp_path, pool_executor):
     tab = pa.table({"a": range(100), "b": range(100)})
@@ -708,7 +707,7 @@ def test_add_columns(tmp_path, pool_executor):
         tab, tmp_path / "dataset", mode="append", max_rows_per_file=25
     )
 
-    dataset.add_columns(double_a, ["a"], pool_executor=pool_executor)
+    dataset.add_columns(double_a, read_columns=["a"], pool_executor=pool_executor)
 
     if pool_executor:
         pool_executor.shutdown()
@@ -722,7 +721,7 @@ def test_add_columns(tmp_path, pool_executor):
         return pa.record_batch([batch["a"]], [col_name])
 
     with pytest.raises(AssertionError):
-        dataset.add_columns(make_new_col, ["a"])
+        dataset.add_columns(make_new_col, read_columns=["a"])
 
 
 def test_delete_data(tmp_path: Path):
