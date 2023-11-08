@@ -14,7 +14,8 @@
 
 //! High-performance [Apache Arrow](https://docs.rs/arrow/latest/arrow/) native Linear Algebra algorithms.
 
-// #![cfg_attr(feature = "avx512", feature(stdsimd))]
+#![cfg_attr(feature="nightly", feature(stdsimd))]
+#![cfg_attr(feature="nightly", feature(portable_simd))]
 
 pub mod distance;
 pub mod kernels;
