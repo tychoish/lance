@@ -31,7 +31,7 @@ use datafusion::{
         ExecutionPlan, SendableRecordBatchStream,
     },
 };
-use datafusion_common::DataFusionError;
+use datafusion_common::{DataFusionError, Statistics};
 use datafusion_physical_expr::Partitioning;
 use futures::TryStreamExt;
 
@@ -175,7 +175,7 @@ impl ExecutionPlan for OneShotExec {
         }
     }
 
-    fn statistics(&self) -> datafusion_common::Statistics {
+    fn statistics(&self) -> std::result::Result<Statistics, DataFusionError> {
         todo!()
     }
 }

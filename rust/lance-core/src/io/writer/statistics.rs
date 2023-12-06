@@ -104,8 +104,8 @@ where
     let (min_value, max_value, null_count) = compute_primitive_statistics::<T>(arrays);
     StatisticsRow {
         null_count,
-        min_value: ScalarValue::new_primitive::<T>(Some(min_value), arrays[0].data_type()),
-        max_value: ScalarValue::new_primitive::<T>(Some(max_value), arrays[0].data_type()),
+        min_value: ScalarValue::new_primitive::<T>(Some(min_value), arrays[0].data_type()).unwrap(),
+        max_value: ScalarValue::new_primitive::<T>(Some(max_value), arrays[0].data_type()).unwrap(),
     }
 }
 
@@ -832,6 +832,7 @@ impl StatisticsBuilder {
         let min_value = row
             .min_value
             .to_array()
+            .unwrap()
             .as_any()
             .downcast_ref::<PrimitiveArray<T>>()
             .unwrap()
@@ -839,6 +840,7 @@ impl StatisticsBuilder {
         let max_value = row
             .max_value
             .to_array()
+            .unwrap()
             .as_any()
             .downcast_ref::<PrimitiveArray<T>>()
             .unwrap()
@@ -944,7 +946,7 @@ impl StatisticsBuilder {
 mod tests {
     use arrow_array::{
         builder::StringDictionaryBuilder, make_array, new_empty_array, new_null_array,
-        types::ArrowPrimitiveType, BinaryArray, BooleanArray, Date32Array, Date64Array, Datum,
+        types::ArrowPrimitiveType, BinaryArray, BooleanArray, Date32Array, Date64Array,
         Decimal128Array, DictionaryArray, DurationMicrosecondArray, DurationMillisecondArray,
         DurationNanosecondArray, DurationSecondArray, FixedSizeBinaryArray, Float32Array,
         Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, LargeBinaryArray,
@@ -1976,7 +1978,7 @@ mod tests {
         value: ScalarValue,
         with_nulls: bool,
     ) -> std::result::Result<(), TestCaseError> {
-        let array_scalar = value.to_scalar();
+        let array_scalar = value.to_scalar().unwrap();
         let (array, _) = array_scalar.get();
         let array = make_array(array.to_data());
 

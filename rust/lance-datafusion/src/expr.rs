@@ -14,6 +14,7 @@
 
 //! Utilities for working with datafusion expressions
 
+use arrow_array::Array;
 use arrow_schema::DataType;
 use datafusion_common::ScalarValue;
 
@@ -241,37 +242,36 @@ pub fn safe_coerce_scalar(value: &ScalarValue, ty: &DataType) -> Option<ScalarVa
             _ => None,
         },
         ScalarValue::Null => Some(value.clone()),
-        ScalarValue::List(vals, _) => {
+        ScalarValue::List(vals) => {
             if let DataType::FixedSizeList(_, size) = ty {
-                if let Some(vals) = vals {
-                    if vals.len() as i32 != *size {
-                        return None;
-                    }
+                if vals.len() as i32 != *size {
+                    return None;
                 }
             }
-            let (new_values, field) = match ty {
-                DataType::List(field)
-                | DataType::LargeList(field)
-                | DataType::FixedSizeList(field, _) => {
-                    if let Some(vals) = vals {
-                        let values = vals
-                            .iter()
-                            .map(|val| safe_coerce_scalar(val, field.data_type()))
-                            .collect::<Option<Vec<_>>>();
-                        (values, field)
-                    } else {
-                        (None, field)
-                    }
+            match ty {
+                DataType::List(_) => Some(ScalarValue::List(vals.to_owned())),
+                DataType::LargeList(_) => Some(ScalarValue::List(vals.to_owned())),
+                DataType::FixedSizeList(field, size) => {
+                    let fsl = datafusion_common::cast::as_fixed_size_list_array(vals)
+                        .unwrap()
+                        .to_owned()
+                        .iter()
+                        .enumerate()
+                        .map(|v| ScalarValue::try_from_array(vals, v.0).unwrap())
+                        .collect::<Vec<ScalarValue>>();
+
+                    // let list_content =
+                    //     .unwrap()
+                    //     .iter()
+                    //     .map(|v| {
+                    //         let mut out = ScalarValue::new_zero(field.data_type()).unwrap();
+                    //         out = arrow_cast::cast(&v.unwrap(), field.data_type()).unwrap();
+                    //         safe_coerce_scalar(&out, field.data_type())
+                    //     })
+                    //     .collect();
+                    Some(ScalarValue::Fixedsizelist(Some(fsl), field.clone(), *size))
                 }
                 _ => return None,
-            };
-
-            match ty {
-                DataType::List(_) => Some(ScalarValue::List(new_values, field.clone())),
-                DataType::FixedSizeList(_, size) => {
-                    Some(ScalarValue::Fixedsizelist(new_values, field.clone(), *size))
-                }
-                _ => None,
             }
         }
         _ => None,

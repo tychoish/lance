@@ -301,9 +301,9 @@ impl Ord for OrderableScalarValue {
             (Fixedsizelist(_, _, _), _) => {
                 panic!("Attempt to compare Fixedsizelist with non-Fixedsizelist")
             }
-            (List(_, _), List(_, _)) => todo!(),
-            (List(v1, _), Null) => {
-                if v1.is_none() {
+            (List(_), List(_)) => todo!(),
+            (List(v1), Null) => {
+                if v1.is_null() {
                     Ordering::Equal
                 } else {
                     Ordering::Greater
