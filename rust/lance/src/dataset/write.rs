@@ -33,6 +33,7 @@ use lance_core::{
 };
 use lance_datafusion::chunker::chunk_stream;
 use object_store::path::Path;
+use snafu::{location, Location};
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -85,12 +86,13 @@ pub struct WriteParams {
 }
 
 impl WriteParams {
+    #[track_caller]
     pub fn ensure_store_is_none(&self) -> Result<()> {
         match self.object_store {
             None => Ok(()),
             Some(_) => Err(Error::invalid_input(
                 "ambiguous object_store configured",
-                std::panic::Location::caller().to_snafu_location(),
+                location!(),
             )),
         }
     }
@@ -105,8 +107,9 @@ impl Default for WriteParams {
             // we are under that.
             max_bytes_per_file: 90 * 1024 * 1024 * 1024, // 90 GB
             mode: WriteMode::Create,
-            store_params: None,
             progress: Arc::new(NoopFragmentWriteProgress::new()),
+            object_store: None,
+            store_params: None,
         }
     }
 }

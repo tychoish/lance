@@ -375,7 +375,10 @@ impl Dataset {
         let mut params = params.unwrap_or_default();
 
         let (object_store, base) = match params.object_store {
-            Some(os) => (os.with_params(params), os.filesystem_path()),
+            Some(ref os) => (
+                os.with_params(&params.clone().store_params.unwrap_or_default()),
+                os.base_path().to_owned(),
+            ),
             None => {
                 ObjectStore::from_uri_and_params(
                     uri,
@@ -415,7 +418,7 @@ impl Dataset {
             warn!("No existing dataset at {uri}, it will be created");
             params = WriteParams {
                 mode: WriteMode::Create,
-                ..params
+                ..params.clone()
             };
         }
         let params = params; // discard mut
@@ -581,17 +584,16 @@ impl Dataset {
             None,
         );
 
-        match write_params {
-            Some(wp) => wp.ensure_store_is_none()?,
-            _ => {}
+        let object_store = match write_params {
+            Some(wp) => {
+                wp.ensure_store_is_none()?;
+                Arc::new(
+                    self.object_store
+                        .with_params(&wp.clone().store_params.unwrap_or_default()),
+                )
+            }
+            _ => self.object_store.clone(),
         };
-
-        let object_store =
-            if let Some(store_params) = write_params.and_then(|params| params.store_params) {
-                Arc::new(self.object_store.with_params(&store_params))
-            } else {
-                self.object_store.clone()
-            };
 
         self.manifest = Arc::new(
             commit_transaction(
