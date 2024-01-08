@@ -79,7 +79,21 @@ pub struct WriteParams {
 
     pub store_params: Option<ObjectStoreParams>,
 
+    pub object_store: Option<ObjectStore>,
+
     pub progress: Arc<dyn WriteFragmentProgress>,
+}
+
+impl WriteParams {
+    pub fn ensure_store_is_none(&self) -> Result<()> {
+        match self.object_store {
+            None => Ok(()),
+            Some(_) => Err(Error::invalid_input(
+                "ambiguous object_store configured",
+                std::panic::Location::caller().to_snafu_location(),
+            )),
+        }
+    }
 }
 
 impl Default for WriteParams {

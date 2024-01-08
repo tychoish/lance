@@ -336,17 +336,54 @@ impl Dataset {
         })
     }
 
+    /// Write to or Create a [Dataset] with a stream of [RecordBatch]s.
+    ///
+    /// Returns the newly created [`Dataset`].
+    /// Or Returns [Error] if the dataset already exists.
+    ///
+    pub async fn write(
+        batches: impl RecordBatchReader + Send + 'static,
+        uri: &str,
+        params: Option<WriteParams>,
+    ) -> Result<Self> {
+        // Box it so we don't monomorphize for every one. We take the generic
+        // parameter for API ergonomics.
+        let batches = Box::new(batches);
+        Self::write_impl(batches, uri, params).await
+    }
+
+    /// Append to existing [Dataset] with a stream of [RecordBatch]s
+    ///
+    /// Returns void result or Returns [Error]
+    pub async fn append(
+        &mut self,
+        batches: impl RecordBatchReader + Send + 'static,
+        params: Option<WriteParams>,
+    ) -> Result<()> {
+        // Box it so we don't monomorphize for every one. We take the generic
+        // parameter for API ergonomics.
+        let batches = Box::new(batches);
+        self.append_impl(batches, params).await
+    }
+
     #[instrument(skip(batches, params))]
-    async fn write_impl(
+    pub(crate) async fn write_impl(
         batches: Box<dyn RecordBatchReader + Send>,
         uri: &str,
         params: Option<WriteParams>,
     ) -> Result<Self> {
         let mut params = params.unwrap_or_default();
 
-        let (object_store, base) =
-            ObjectStore::from_uri_and_params(uri, &params.store_params.clone().unwrap_or_default())
-                .await?;
+        let (object_store, base) = match params.object_store {
+            Some(os) => (os.with_params(params), os.filesystem_path()),
+            None => {
+                ObjectStore::from_uri_and_params(
+                    uri,
+                    &params.store_params.clone().unwrap_or_default(),
+                )
+                .await?
+            }
+        };
 
         // Read expected manifest path for the dataset
         let dataset_exists = match object_store
@@ -462,22 +499,6 @@ impl Dataset {
         })
     }
 
-    /// Write to or Create a [Dataset] with a stream of [RecordBatch]s.
-    ///
-    /// Returns the newly created [`Dataset`].
-    /// Or Returns [Error] if the dataset already exists.
-    ///
-    pub async fn write(
-        batches: impl RecordBatchReader + Send + 'static,
-        uri: &str,
-        params: Option<WriteParams>,
-    ) -> Result<Self> {
-        // Box it so we don't monomorphize for every one. We take the generic
-        // parameter for API ergonomics.
-        let batches = Box::new(batches);
-        Self::write_impl(batches, uri, params).await
-    }
-
     async fn append_impl(
         &mut self,
         batches: Box<dyn RecordBatchReader + Send>,
@@ -488,6 +509,7 @@ impl Dataset {
             mode: WriteMode::Append,
             ..params.unwrap_or_default()
         };
+        params.ensure_store_is_none()?;
 
         // Need to include params here because it might include a commit mechanism.
         let object_store = Arc::new(
@@ -531,20 +553,6 @@ impl Dataset {
         Ok(())
     }
 
-    /// Append to existing [Dataset] with a stream of [RecordBatch]s
-    ///
-    /// Returns void result or Returns [Error]
-    pub async fn append(
-        &mut self,
-        batches: impl RecordBatchReader + Send + 'static,
-        params: Option<WriteParams>,
-    ) -> Result<()> {
-        // Box it so we don't monomorphize for every one. We take the generic
-        // parameter for API ergonomics.
-        let batches = Box::new(batches);
-        self.append_impl(batches, params).await
-    }
-
     pub async fn latest_manifest(&self) -> Result<Manifest> {
         read_manifest(
             &self.object_store,
@@ -572,6 +580,11 @@ impl Dataset {
             },
             None,
         );
+
+        match write_params {
+            Some(wp) => wp.ensure_store_is_none()?,
+            _ => {}
+        };
 
         let object_store =
             if let Some(store_params) = write_params.and_then(|params| params.store_params) {
