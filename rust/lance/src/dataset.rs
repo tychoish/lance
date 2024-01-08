@@ -367,7 +367,7 @@ impl Dataset {
     }
 
     #[instrument(skip(batches, params))]
-    pub(crate) async fn write_impl(
+    async fn write_impl(
         batches: Box<dyn RecordBatchReader + Send>,
         uri: &str,
         params: Option<WriteParams>,
